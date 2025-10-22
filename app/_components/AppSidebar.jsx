@@ -1,5 +1,6 @@
 "use client"
-
+import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -7,51 +8,73 @@ import {
   SidebarGroup,
   SidebarHeader,
 } from "@/components/ui/sidebar"
-import { Sun, Moon } from "lucide-react"
+import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import Image from "next/image"
 
 export function AppSidebar() {
   const { theme, setTheme } = useTheme()
-  const isDark = theme === "dark"
+  const [mounted, setMounted] = useState(false)
 
-  const toggleTheme = () => {
-    setTheme(isDark ? "light" : "dark")
-  }
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
-    <Sidebar className={isDark ? "bg-[#181820] text-white" : "bg-white text-[#181820] border-r border-gray-200"}>
-      <SidebarHeader />
-      <div className="flex items-center gap-3 px-4 py-6">
-        <img src={'/logo.svg'} alt="logo" width={40} height={40} className="w-[40px] h-[40px]" />
-        <h2 className={isDark ? "font-bold text-xl text-white" : "font-bold text-xl text-[#181820]"}>
-          AI Fusion
-        </h2>
-        <button onClick={toggleTheme} className="ml-auto">
-          {isDark ? <Sun className="text-yellow-300" /> : <Moon className="text-blue-600" />}
-        </button>
-      </div>
-      <button className={isDark 
-        ? "w-[90%] ml-auto mr-auto my-5 py-2 rounded bg-[#25232e] hover:bg-[#34324c] transition text-white"
-        : "w-[90%] ml-auto mr-auto my-5 py-2 rounded bg-gray-100 hover:bg-gray-200 transition text-[#181820]"
-      }>+ New Chat</button>
+    <Sidebar>
+      <SidebarHeader>
+        <div className="p-3">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+             <Image
+                src="/logo.svg"
+                alt="logo"
+                width={60}
+                height={60}
+                className="w-[40px] h-[40px]"
+              />
+               
+              
+              <h2 className="font-bold text-xl">AI Fusion</h2>
+            </div>
+
+            {/* Theme Toggle Button */}
+            <div>
+              {mounted && theme === "light" ? (
+                <Button variant="ghost" onClick={() => setTheme("dark")}>
+                  <Sun />
+                </Button>
+              ) : mounted ? (
+                <Button onClick={() => setTheme("light")}>
+                  <Moon />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* New Chat Button */}
+          <Button className="mt-7 w-full" size="lg">
+            + New Chat
+          </Button>
+        </div>
+      </SidebarHeader>
+
       <SidebarContent>
         <SidebarGroup>
-            <div className={'p-3'}>
-                <h2 className="font-bold text-lg">Chat</h2>
-            <p className="text-sm text-gray-400"  >Sign in to Start Chatting With Multiple Ai Model </p>
-            </div>
-            
+          <div className="p-3">
+            <h2 className="font-bold text-lg">Chat</h2>
+            <p className="text-sm text-gray-400">
+              Sign in to start chatting with multiple AI models
+            </p>
+          </div>
         </SidebarGroup>
-        
-        
       </SidebarContent>
+
       <SidebarFooter>
-        <div className="flex items-center gap-10 p-5 mb-4">
-           <button className={isDark 
-        ? "w-[110%] ml-auto mr-auto my-5 py-2 rounded bg-[#25232e] hover:bg-[#34324c] transition text-white"
-        : "w-[110%] ml-auto mr-auto my-5 py-2 rounded bg-gray-100 hover:bg-gray-200 transition text-[#181820]"
-      }>Sign-In/Sign-Up</button>
+        <div className="p-3 mb-10">
+          <Button className="w-full" size="lg">
+            Sign In / Sign Up
+          </Button>
         </div>
       </SidebarFooter>
     </Sidebar>
