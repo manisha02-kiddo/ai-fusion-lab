@@ -13,7 +13,7 @@ export default function AppHeader() {
   return (
     <div className='p-3 w-full shadow flex justify-between items-center'>
       <SidebarTrigger/>
-      <button>Sign In</button>
+      
     </div>
   );
 }
