@@ -1,39 +1,90 @@
-import axios from "axios";
 import { NextResponse } from "next/server";
+import axios from "axios";
 
 export async function POST(req) {
   try {
-    const { model, msg, parentModel } = await req.json();
+    const body = await req.json();
+    const { model, parentModel, messages } = body;
 
-    console.log("Loaded API Key:", process.env.KRAVIXSTUDIO_API_KEY);
+    console.log("📩 Incoming:", body);
 
-    const response = await axios.post(
-      "https://kravixstudio.com/api/v1/chat",
-      {
-        message: msg,
-        aiModel: model,
-        outputType: "text",
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + process.env.KRAVIXSTUDIO_API_KEY,
+    let aiResponse = "";
+
+    // GPT + DeepSeek + Gemini use different APIs
+    // ----------------------------------------------------
+
+    // ✅ 1. GPT (OpenRouter)
+    if (parentModel === "GPT") {
+      const res = await axios.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          model,
+          messages,
         },
-      }
-    );
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-    console.log("✅ API Response:", response.data);
+      aiResponse = res.data.choices?.[0]?.message?.content || "No response";
+    }
 
-    return NextResponse.json({
-      ...response.data,
-      model: parentModel,
-    });
-  } catch (error) {
-    console.error("❌ AI API Error:", error.response?.data || error.message);
+    // ✅ 2. Gemini (Google API)
+    if (parentModel === "Gemini") {
+      const GEMINI_KEY = process.env.GEMINI_API_KEY;
+
+      // IMPORTANT: use messages[0].content (your user message)
+      const userText = messages?.[0]?.content || "";
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${GEMINI_KEY}`;
+
+      const res = await axios.post(url, {
+        contents: [
+          {
+            parts: [{ text: userText }],
+          },
+        ],
+      });
+
+      aiResponse =
+        res.data.candidates?.[0]?.content?.parts?.[0]?.text || "No reply";
+    }
+
+    // ✅ 3. DeepSeek (OpenRouter — force English)
+    if (parentModel === "DeepSeek") {
+      const res = await axios.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          model,
+          messages: [
+            {
+              role: "system",
+              content: "Respond ONLY in English. Never reply in Chinese.",
+            },
+            ...messages,
+          ],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      aiResponse = res.data.choices?.[0]?.message?.content || "No response";
+    }
+
+    return NextResponse.json({ aiResponse, model: parentModel });
+  } catch (err) {
+    console.error("❌ API ERROR:", err.response?.data || err.message || err);
     return NextResponse.json(
       {
-        error: "Failed to connect to AI API",
-        details: error.response?.data || error.message,
+        error: "API Error",
+        details: err.response?.data || err.message,
       },
       { status: 500 }
     );
