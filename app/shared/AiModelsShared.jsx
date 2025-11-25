@@ -1,10 +1,18 @@
 // app/_components/shared/AiModelsShared.jsx
+
 export const DefaultModel = {
-  GPT: { modelId: "gpt-4.1-mini" },
-  Gemini: { modelId: "gemini-3.5-flash-lite" },
-  DeepSeek: { modelId: "deepseek-r1" },
-  Mistral: { modelId: "mistral-medium-2505" },
-  Grok: { modelId: "grok-3-mini" },
-  Cohere: { modelId: "cohere-command-a" },
-  Llama: { modelId: "llama-3.3-70b-instruct" },
+  // GPT models → OpenRouter
+  GPT: { modelId: "openai/gpt-4o-mini" },
+
+  // Gemini models → REAL Google Gemini API
+  Gemini: { modelId: "gemini-1.5-flash" },
+
+  // DeepSeek models → OpenRouter
+  DeepSeek: { modelId: "deepseek/deepseek-r1" },
+
+  // Optional future premium models
+  // Mistral: { modelId: "mistralai/mistral-medium" },
+  // Grok: { modelId: "xai/grok-2" },
+  // Cohere: { modelId: "cohere/command-r" },
+  // Llama: { modelId: "meta-llama/llama-3.1-70b" },
 };
