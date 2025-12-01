@@ -16,22 +16,21 @@ import { Switch } from "@/components/ui/switch";
 import { Loader, Lock, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AiSelectedModelContext } from "@/context/AiSelectedModelContext";
-
-// Markdown support
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 function AiMultiModels() {
-  const { aiSelectedModels, setAiSelectedModels, messages } =
+  const { aiSelectedModels, setAiSelectedModels, messages, autoScroll } =
     useContext(AiSelectedModelContext);
 
   const [aiModelList, setAiModelList] = useState(AiModelList);
 
-  // AUTO-SCROLL refs
   const scrollRefs = useRef({});
 
-  // Auto-scroll whenever messages update
+  // AUTO SCROLL (only when autoScroll === true)
   useEffect(() => {
+    if (!autoScroll) return;
+
     Object.keys(scrollRefs.current).forEach((parent) => {
       const box = scrollRefs.current[parent];
       if (box) {
@@ -41,16 +40,14 @@ function AiMultiModels() {
         });
       }
     });
-  }, [messages]);
+  }, [messages, autoScroll]);
 
-  // Enable / disable model column
   const onToggleChange = (modelName, value) => {
     setAiModelList((prev) =>
       prev.map((m) => (m.model === modelName ? { ...m, enable: value } : m))
     );
   };
 
-  // Select new model ID
   const onSelectValue = (parentModel, modelId) => {
     const updated = {
       ...aiSelectedModels,
@@ -60,7 +57,7 @@ function AiMultiModels() {
   };
 
   return (
-    <div className="flex flex-1 h-[calc(100vh-140px)] border-b">
+    <div className="flex flex-1 h-[calc(100vh-140px)] border-b dark:border-neutral-800">
       {aiModelList.map((model, index) => {
         const parent = model.model;
         const isPremiumUser = false;
@@ -69,12 +66,12 @@ function AiMultiModels() {
         return (
           <div
             key={index}
-            className={`flex flex-col border-r h-full transition-all ${
+            className={`flex flex-col border-r dark:border-neutral-800 h-full transition-all ${
               model.enable ? "flex-1 min-w-[350px]" : "w-[100px]"
             }`}
           >
             {/* Header */}
-            <div className="flex w-full h-[60px] items-center justify-between p-4 border-b bg-white">
+            <div className="flex w-full h-[60px] items-center justify-between p-4 border-b bg-white dark:bg-neutral-900 dark:text-white">
               <div className="flex items-center gap-4">
                 <Image src={model.icon} alt={model.model} width={24} height={24} />
 
@@ -84,29 +81,48 @@ function AiMultiModels() {
                     onValueChange={(value) => onSelectValue(parent, value)}
                     disabled={model.premium}
                   >
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Select model" />
+                    <SelectTrigger className="w-40 bg-white dark:bg-neutral-800 border dark:border-neutral-700 text-black dark:text-white">
+                      <SelectValue
+                        placeholder="Select model"
+                        className="text-black dark:text-white"
+                      />
                     </SelectTrigger>
 
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-neutral-800 dark:text-white border dark:border-neutral-700">
                       <SelectGroup className="px-3">
-                        <SelectLabel className="text-sm text-gray-400">Free</SelectLabel>
+                        <SelectLabel className="text-sm text-gray-500 dark:text-gray-300">
+                          Free
+                        </SelectLabel>
+
                         {model.subModel
                           .filter((m) => !m.premium)
                           .map((sub, i) => (
-                            <SelectItem key={i} value={sub.id}>
+                            <SelectItem
+                              key={i}
+                              value={sub.id}
+                              className="dark:text-white dark:hover:bg-neutral-700"
+                            >
                               {sub.name}
                             </SelectItem>
                           ))}
                       </SelectGroup>
 
                       <SelectGroup className="px-3">
-                        <SelectLabel className="text-sm text-gray-400">Premium</SelectLabel>
+                        <SelectLabel className="text-sm text-gray-500 dark:text-gray-300">
+                          Premium
+                        </SelectLabel>
+
                         {model.subModel
                           .filter((m) => m.premium)
                           .map((sub, i) => (
-                            <SelectItem key={i} value={sub.id} disabled>
-                              {sub.name} <Lock className="h-4 w-4 inline-block ml-1" />
+                            <SelectItem
+                              key={i}
+                              value={sub.id}
+                              disabled
+                              className="dark:text-gray-400 dark:hover:bg-neutral-700"
+                            >
+                              {sub.name}{" "}
+                              <Lock className="h-4 w-4 inline-block ml-1" />
                             </SelectItem>
                           ))}
                       </SelectGroup>
@@ -115,18 +131,26 @@ function AiMultiModels() {
                 )}
               </div>
 
-              {/* Toggle */}
               {model.enable ? (
-                <Switch checked={model.enable} onCheckedChange={(v) => onToggleChange(parent, v)} />
+                <Switch
+                  checked={model.enable}
+                  onCheckedChange={(v) => onToggleChange(parent, v)}
+                />
               ) : (
-                <MessageSquare className="cursor-pointer" onClick={() => onToggleChange(parent, true)} />
+                <MessageSquare
+                  className="cursor-pointer dark:text-white"
+                  onClick={() => onToggleChange(parent, true)}
+                />
               )}
             </div>
 
             {/* Lock View */}
             {showLock && model.enable && (
               <div className="flex items-center justify-center h-full">
-                <Button variant="outline">
+                <Button
+                  variant="outline"
+                  className="dark:border-neutral-700 dark:text-white"
+                >
                   <Lock className="mr-2" /> Upgrade to Unlock
                 </Button>
               </div>
@@ -144,7 +168,7 @@ function AiMultiModels() {
                     className={`p-3 rounded-lg whitespace-pre-wrap ${
                       m.role === "user"
                         ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        : "bg-gray-100 dark:bg-neutral-800 text-gray-900 dark:text-gray-100"
                     }`}
                   >
                     {m.loading ? (

@@ -1,12 +1,15 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
+
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./_components/AppSidebar";
 import AppHeader from "./_components/AppHeader";
+
 import { useUser } from "@clerk/nextjs";
 
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore"; // ✅ added updateDoc
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/config/FirebaseConfig";
 
 import { AiSelectedModelContext } from "@/context/AiSelectedModelContext";
@@ -17,79 +20,81 @@ function Provider({ children, ...props }) {
   const { user } = useUser();
 
   const [aiSelectedModels, setAiSelectedModels] = useState(DefaultModel);
+  const [messages, setMessages] = useState({});
   const [userDetail, setUserDetail] = useState(null);
-  const [messages, setMessages] = useState({}); // ✅ safe default
 
-  // -----------------------------
-  // 1️⃣ UPDATE MODEL PREF IN FIREBASE
-  // -----------------------------
-  useEffect(() => {
-    if (!user || !user.primaryEmailAddress) return; // ⛔ prevent crash
-    if (!aiSelectedModels) return;
+  // 👇 NEW: controls auto-scroll behaviour in AiMultiModels
+  const [autoScroll, setAutoScroll] = useState(true);
 
-    updateAiModelSelectionPref();
-  }, [aiSelectedModels, user]);
-
-  const updateAiModelSelectionPref = async () => {
-    try {
-      const email = user?.primaryEmailAddress?.emailAddress;
-      if (!email) return;
-
-      const docRef = doc(db, "users", email);
-
-      await updateDoc(docRef, {
-        selectedModelPref: aiSelectedModels,
-      });
-
-      console.log("🔥 Saved model preference to Firestore");
-    } catch (error) {
-      console.error("❌ Error updating model pref:", error);
-    }
-  };
-
-  // -----------------------------
-  // 2️⃣ CREATE OR FETCH USER
-  // -----------------------------
+  // --------------------------------------------------------------------
+  //  1) CREATE USER IN FIRESTORE FIRST (OR LOAD EXISTING USER)
+  // --------------------------------------------------------------------
   useEffect(() => {
     const createOrFetchUser = async () => {
-      const email = user?.primaryEmailAddress?.emailAddress;
-      if (!email) return;
+      if (!user?.primaryEmailAddress?.emailAddress) return;
 
+      const email = user.primaryEmailAddress.emailAddress;
       const userRef = doc(db, "users", email);
-      const userSnap = await getDoc(userRef);
+      const snap = await getDoc(userRef);
 
-      if (userSnap.exists()) {
-        const info = userSnap.data();
+      if (snap.exists()) {
+        const data = snap.data();
 
-        // load saved model if exists
-        setAiSelectedModels(info?.selectedModelPref ?? DefaultModel);
+        setUserDetail(data);
 
-        setUserDetail(info);
-        console.log("✅ Existing user loaded");
+        // Load saved selected models if available
+        setAiSelectedModels(data?.selectedModelPref ?? DefaultModel);
+
+        console.log("✅ Existing user loaded from Firestore");
       } else {
         const newUser = {
           name: user.fullName,
-          email: email,
+          email,
           createdAt: new Date(),
-          remainingMsg: 5,
           plan: "Free",
+          remainingMsg: 5,
           credits: 1000,
-          selectedModelPref: DefaultModel, // 🆕 default save
+          selectedModelPref: DefaultModel,
         };
 
         await setDoc(userRef, newUser);
-        setUserDetail(newUser);
 
-        console.log("🆕 New user created");
+        setUserDetail(newUser);
+        console.log("🆕 New user created in Firestore");
       }
     };
 
     if (user) createOrFetchUser();
   }, [user]);
 
-  // -----------------------------
-  // RETURN PROVIDERS
-  // -----------------------------
+  // --------------------------------------------------------------------
+  //  2) UPDATE MODEL PREFERENCE IN FIRESTORE (ONLY AFTER USER EXISTS)
+  // --------------------------------------------------------------------
+  useEffect(() => {
+    const saveModelPref = async () => {
+      if (!user?.primaryEmailAddress?.emailAddress) return;
+      if (!userDetail) return; // ensure user exists first
+
+      try {
+        const email = user.primaryEmailAddress.emailAddress;
+        const userRef = doc(db, "users", email);
+
+        await updateDoc(userRef, {
+          selectedModelPref: aiSelectedModels,
+        });
+
+        console.log("🔥 Model preference saved");
+      } catch (error) {
+        console.error("❌ Error saving model pref:", error);
+      }
+    };
+
+    saveModelPref();
+  }, [aiSelectedModels, userDetail]);
+
+  // --------------------------------------------------------------------
+  //  RENDER PROVIDERS
+  // --------------------------------------------------------------------
   return (
     <NextThemesProvider
       {...props}
@@ -100,7 +105,14 @@ function Provider({ children, ...props }) {
     >
       <UserDetailContext.Provider value={{ userDetail, setUserDetail }}>
         <AiSelectedModelContext.Provider
-          value={{ aiSelectedModels, setAiSelectedModels, messages, setMessages }}
+          value={{
+            aiSelectedModels,
+            setAiSelectedModels,
+            messages,
+            setMessages,
+            autoScroll,
+            setAutoScroll, // 👈 expose to children
+          }}
         >
           <SidebarProvider>
             <AppSidebar />

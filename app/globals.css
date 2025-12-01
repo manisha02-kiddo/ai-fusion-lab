@@ -144,3 +144,14 @@
     --sidebar-ring: oklch(0.439 0 0);
   }
 }
+  html, body {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+ main {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+.dark .select-trigger {
+  color: white !important;
+}

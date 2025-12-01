@@ -8,9 +8,6 @@ export const AiSelectedModelProvider = ({ children }) => {
   const defaultModels = {
     GPT: { modelId: "openai/gpt-4o-mini" },
     Gemini: { modelId: "models/gemini-2.5-flash" },
-
-
-
     DeepSeek: { modelId: "deepseek/deepseek-r1" },
   };
 
@@ -24,15 +21,26 @@ export const AiSelectedModelProvider = ({ children }) => {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("selectedModelPref", JSON.stringify(aiSelectedModels));
+      localStorage.setItem(
+        "selectedModelPref",
+        JSON.stringify(aiSelectedModels)
+      );
     }
   }, [aiSelectedModels]);
 
   const [messages, setMessages] = useState({});
+  const [scrollToken, setScrollToken] = useState(0);
 
   return (
     <AiSelectedModelContext.Provider
-      value={{ aiSelectedModels, setAiSelectedModels, messages, setMessages }}
+      value={{
+        aiSelectedModels,
+        setAiSelectedModels,
+        messages,
+        setMessages,
+        scrollToken,
+        setScrollToken,
+      }}
     >
       {children}
     </AiSelectedModelContext.Provider>

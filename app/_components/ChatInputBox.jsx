@@ -3,52 +3,68 @@
 import { Button } from "@/components/ui/button";
 import React, { useContext, useState, useEffect } from "react";
 import { Paperclip, Mic, Send } from "lucide-react";
-import AiMultiModels from "./AiMultiModels";
 import { AiSelectedModelContext } from "@/context/AiSelectedModelContext";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 
-// ✅ Firestore
 import { db } from "@/config/FirebaseConfig";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-function ChatInputBox() {
+import { useUser } from "@clerk/nextjs";
+import { useSearchParams } from "next/navigation";
+
+export default function ChatInputBox() {
   const [userInput, setUserInput] = useState("");
-  const { aiSelectedModels, messages, setMessages } = useContext(AiSelectedModelContext);
+
+  const {
+    aiSelectedModels,
+    messages,
+    setMessages,
+    setAutoScroll,
+  } = useContext(AiSelectedModelContext);
+
+  const { user } = useUser();
+  const params = useSearchParams();
 
   const [chatId, setChatId] = useState("");
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  // Create unique chat ID only once
+  // Detect existing chat or create new (client-only)
   useEffect(() => {
-    setChatId(uuidv4());
-  }, []);
+    const existing = params.get("chatId");
+    if (existing) {
+      setChatId(existing);
+    } else {
+      setChatId(uuidv4());
+    }
+    setInitialLoadComplete(true);
+  }, [params]);
 
   // ============================
-  //     SEND MESSAGE FUNCTION
+  // SEND MESSAGE
   // ============================
   const handleSend = async () => {
     if (!userInput.trim()) return;
 
-    const userMessage = userInput.trim();
+    const text = userInput.trim();
     setUserInput("");
 
-    // Push user message to all models
+    // when sending, enable auto-scroll again
+    setAutoScroll(true);
+
+    // add user message to all enabled models
     setMessages((prev) => {
       const updated = { ...prev };
-      Object.keys(aiSelectedModels).forEach((parent) => {
-        updated[parent] = [
-          ...(updated[parent] || []),
-          { role: "user", content: userMessage },
-        ];
+      Object.keys(aiSelectedModels).forEach((m) => {
+        updated[m] = [...(updated[m] || []), { role: "user", content: text }];
       });
       return updated;
     });
 
-    // Send to backend for each model
     for (const [parentModel, modelInfo] of Object.entries(aiSelectedModels)) {
-      const modelId = modelInfo?.modelId;
+      const modelId = modelInfo.modelId;
 
-      // Add loading bubble
+      // add "thinking..." bubble
       setMessages((prev) => ({
         ...prev,
         [parentModel]: [
@@ -61,99 +77,86 @@ function ChatInputBox() {
         const res = await axios.post("/api/ai-multi-model", {
           model: modelId,
           parentModel,
-          messages: [{ role: "user", content: userMessage }],
+          messages: [{ role: "user", content: text }],
         });
 
         const reply = res.data?.aiResponse || "⚠️ No response";
 
-        // Replace loading with final response
         setMessages((prev) => {
-          const old = prev[parentModel];
-          const cleaned = [...old];
-          cleaned.pop(); // remove loading
-          cleaned.push({ role: "assistant", content: reply });
-          return { ...prev, [parentModel]: cleaned };
+          const updated = [...prev[parentModel]];
+          updated.pop();
+          updated.push({ role: "assistant", content: reply });
+          return { ...prev, [parentModel]: updated };
         });
       } catch (err) {
-        const details =
-          err.response?.data?.details ||
-          err.response?.data ||
-          err.message;
-
         setMessages((prev) => {
-          const old = prev[parentModel];
-          const cleaned = [...old];
-          cleaned.pop();
-          cleaned.push({
+          const updated = [...prev[parentModel]];
+          updated.pop();
+          updated.push({
             role: "assistant",
-            content: `⚠️ Error: ${String(details).slice(0, 200)}`,
+            content: "⚠️ Error fetching response",
           });
-          return { ...prev, [parentModel]: cleaned };
+          return { ...prev, [parentModel]: updated };
         });
       }
     }
   };
 
   // ============================
-  //      AUTO SAVE MESSAGES
+  // SAVE TO FIRESTORE
   // ============================
   useEffect(() => {
+    if (!initialLoadComplete) return;
     if (!chatId || !messages) return;
-    saveMessages();
-  }, [messages]);
 
-  const saveMessages = async () => {
-    const docRef = doc(db, "chatHistory", chatId);
+    const email = user?.primaryEmailAddress?.emailAddress;
+    if (!email) return;
 
-    await setDoc(docRef, {
-      chatId: chatId,
-      messages: messages,
-      createdAt: new Date(),
-    });
-  };
+    setDoc(
+      doc(db, "chatHistory", chatId),
+      {
+        chatId,
+        userEmail: email,
+        messages,
+        lastUpdated: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }, [messages, chatId, initialLoadComplete, user]);
 
   // ============================
-  //          UI
+  // UI
   // ============================
   return (
-    <div className="relative min-h-screen">
-      <AiMultiModels />
+    <div className="fixed bottom-0 left-0 right-0 flex justify-center pb-6 z-50 bg-transparent">
+      <div className="w-full max-w-3xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-2xl shadow-md px-4 py-3">
+        <div className="w-full flex items-center gap-3">
+          <Button variant="ghost" size="icon">
+            <Paperclip className="text-black dark:text-white" />
+          </Button>
 
-      {/* Input Box */}
-      <div className="fixed bottom-0 left-0 w-full flex justify-center px-4 pb-4 z-50">
-        <div className="w-full border rounded-xl shadow-md max-w-2xl p-4 bg-white">
           <input
             type="text"
             placeholder="Ask me anything..."
-            className="w-full bg-transparent outline-none"
+            className="flex-1 bg-transparent text-black dark:text-white outline-none placeholder-gray-500 dark:placeholder-gray-400"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
           />
 
-          <div className="mt-3 flex justify-between items-center">
-            <Button variant="ghost" size="icon">
-              <Paperclip className="h-5 w-5" />
-            </Button>
+          <Button variant="ghost" size="icon">
+            <Mic className="text-black dark:text-white" />
+          </Button>
 
-            <div className="flex gap-5">
-              <Button variant="ghost" size="icon">
-                <Mic />
-              </Button>
-
-              <Button
-                onClick={handleSend}
-                size="icon"
-                className="bg-blue-600 text-white"
-              >
-                <Send />
-              </Button>
-            </div>
-          </div>
+          <Button
+            onClick={handleSend}
+            className="bg-blue-600 text-white hover:bg-blue-700"
+          >
+            <Send size={18} />
+          </Button>
         </div>
       </div>
     </div>
   );
 }
-
-export default ChatInputBox;
