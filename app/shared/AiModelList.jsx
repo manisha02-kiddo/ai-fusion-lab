@@ -1,77 +1,85 @@
 export default [
-    {
-        model: "GPT",
-        icon: "/gpt.png",
-        premium: false,
-        enable: true,
-        subModel: [
-            { name: "GPT 3.5", premium: false, id: "gpt-4.1-mini" },
-            { name: "GPT 3.5 Turbo", premium: false, id: "" },
-            { name: "GPT 4.1 Mini", premium: false, id: "" },
-            { name: "GPT4.1", premium: true, id: "" },
-            { name: "GPT5 Nano", premium: false, id: "" },
-            { name: "GPT 5 Mini", premium: false, id: "" },
-            { name: "GPT 5", premium: true, id: "" },
-        ],
-    },
-    {
-        model: "Gemini",
-        icon: "/gemini.png",
-        premium: false,
-        enable: true,
-        subModel: [{ name: "Gemini 2.5 lite", premium: false, id:"gemini-2.5-flash-lite" },
-        { name: "Gemini 2.5 Flash", premium: false, id:"" },
-        { name: "Gemini 2.5 Pro", premium: true,id:"" }
-        ],
-    },
-    {
-        model: "DeepSeek",
-        icon: "/deepseek.png",
-        premium: false,
-        enable: true,
-        subModel: [
-            { name: "DeepSeek R1", premium: false, id: "DeepSeek-R1" },
-            { name: "DeepSeek R1 0528", premium: true, id: "" },
-        ],
-    },
-    {
-        model: "Mistral",
-        icon: "/mistral.png",
-        premium: true,
-        enable: true,
-        subModel: [
-            { name: "Mistral Medium 2025", premium: true, id: "mistral-medium-2025" },
-            { name: "Ministral 3B", premium: false, id: "" },
-        ],
-    },
-    {
-        model: "Grok",
-        icon: "/grok.png",
-        premium: true,
-        enable: true,
-        subModel: [
-            { name: "Grok 3 Mini", premium: false, id: "grok-3-mini" },
-            { name: "Grok 3", premium: true, id: "" },
-        ],
-    },
-    {
-        model: "Cohere",
-        icon: "/cohere.png",
-        premium: true,
-        enable: true,
-        subModel: [
-            { name: "Cohere Command A", premium: false, id: "cohere-command-a" },
-            { name: "Cohere Command R 08-2024", premium: false, id: "" },
-        ],
-    },
-    {
-        model: "Llama",
-        icon: "/llama.png",
-        premium: true,
-        enable: true,
-        subModel: [
-            { name: "Llama 3.3 70B Instruct", premium: true, id: "Llama-3.3-70B-instruct" },
-            { name: "Llama 4 Scout 17B 16E Instruct", premium: true, id: "" },
-        ],
-    },
+  {
+    model: "GPT",
+    icon: "/gpt.png",
+    premium: false,
+    enable: true,
+    subModel: [
+      { name: "GPT-4o Mini", premium: false, id: "openai/gpt-4o-mini" },
+      { name: "GPT-4.1", premium: true, id: "openai/gpt-4.1" }
+    ],
+  },
+
+  {
+  model: "Gemini",
+  icon: "/gemini.png",
+  premium: false,
+  enable: true,
+  subModel: [
+    { name: "Gemini 2.5 Flash", premium: false, id: "models/gemini-2.5-flash" },
+    { name: "Gemini Flash Latest", premium: false, id: "models/gemini-flash-latest" },
+    { name: "Gemini 2.0 Flash", premium: false, id: "models/gemini-2.0-flash" },
+
+    // Premium (optional)
+    { name: "Gemini 2.5 Pro", premium: true, id: "models/gemini-2.5-pro" },
+  ],
+},
+
+
+
+
+  {
+    model: "DeepSeek",
+    icon: "/deepseek.png",
+    premium: false,
+    enable: true,
+    subModel: [
+      { name: "DeepSeek R1", premium: false, id: "deepseek/deepseek-r1" },
+      { name: "DeepSeek R1 Distill", premium: true, id: "deepseek/deepseek-r1-distill" }
+    ],
+  },
+  // PREMIUM MODELS
+  {
+    model: "Mistral",
+    icon: "/mistral.png",
+    premium: true,
+    enable: false,
+    subModel: [
+      { name: "Mistral Small", premium: true, id: "mistralai/mistral-small" },
+      { name: "Mistral Medium", premium: true, id: "mistralai/mistral-medium" },
+      { name: "Mistral Large", premium: true, id: "mistralai/mistral-large" },
+    ],
+  },
+
+  {
+    model: "Llama",
+    icon: "/llama.png",
+    premium: true,
+    enable: false,
+    subModel: [
+      { name: "Llama 3.1 8B", premium: true, id: "meta-llama/llama-3.1-8b" },
+      { name: "Llama 3.1 70B", premium: true, id: "meta-llama/llama-3.1-70b" },
+    ],
+  },
+
+  {
+    model: "Grok",
+    icon: "/grok.png",
+    premium: true,
+    enable: false,
+    subModel: [
+      { name: "Grok-2", premium: true, id: "xai/grok-2" },
+    ],
+  },
+
+  {
+    model: "Cohere",
+    icon: "/cohere.png",
+    premium: true,
+    enable: false,
+    subModel: [
+      { name: "Command R", premium: true, id: "cohere/command-r" },
+      { name: "Command R+", premium: true, id: "cohere/command-r-plus" },
+    ],
+  },
 ];

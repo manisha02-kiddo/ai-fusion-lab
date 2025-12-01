@@ -1,40 +1,54 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
-// ✅ Export the context itself
 export const AiSelectedModelContext = createContext();
 
 export const AiSelectedModelProvider = ({ children }) => {
-  const [selectedModel, setSelectedModel] = useState(() => {
-    // Load from localStorage if available
+  const defaultModels = {
+    GPT: { modelId: "openai/gpt-4o-mini" },
+    Gemini: { modelId: "models/gemini-2.5-flash" },
+    DeepSeek: { modelId: "deepseek/deepseek-r1" },
+  };
+
+  const [aiSelectedModels, setAiSelectedModels] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("selectedModel") || "gemini-2.5-flash-lite";
+      const saved = localStorage.getItem("selectedModelPref");
+      if (saved) return JSON.parse(saved);
     }
-    return "gemini-2.5-flash-lite"; // Default model
+    return defaultModels;
   });
 
   useEffect(() => {
-    // Save to localStorage whenever model changes
-    if (selectedModel) {
-      localStorage.setItem("selectedModel", selectedModel);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        "selectedModelPref",
+        JSON.stringify(aiSelectedModels)
+      );
     }
-  }, [selectedModel]);
+  }, [aiSelectedModels]);
+
+  const [messages, setMessages] = useState({});
+  const [scrollToken, setScrollToken] = useState(0);
 
   return (
-    <AiSelectedModelContext.Provider value={{ selectedModel, setSelectedModel }}>
+    <AiSelectedModelContext.Provider
+      value={{
+        aiSelectedModels,
+        setAiSelectedModels,
+        messages,
+        setMessages,
+        scrollToken,
+        setScrollToken,
+      }}
+    >
       {children}
     </AiSelectedModelContext.Provider>
   );
 };
 
-// ✅ Custom hook for easy usage
 export const useAiSelectedModel = () => {
-  const context = useContext(AiSelectedModelContext);
-  if (!context) {
-    throw new Error(
-      "useAiSelectedModel must be used within an AiSelectedModelProvider"
-    );
-  }
-  return context;
+  const ctx = useContext(AiSelectedModelContext);
+  if (!ctx) throw new Error("useAiSelectedModel must be inside provider");
+  return ctx;
 };
