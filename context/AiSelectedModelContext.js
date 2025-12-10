@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 export const AiSelectedModelContext = createContext();
 
@@ -12,24 +12,33 @@ export const AiSelectedModelProvider = ({ children }) => {
   };
 
   const [aiSelectedModels, setAiSelectedModels] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("selectedModelPref");
-      if (saved) return JSON.parse(saved);
+    try {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("selectedModelPref");
+        if (saved) return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Unable to read selectedModelPref", e);
     }
     return defaultModels;
   });
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(
-        "selectedModelPref",
-        JSON.stringify(aiSelectedModels)
-      );
+    try {
+      if (typeof window !== "undefined")
+        localStorage.setItem("selectedModelPref", JSON.stringify(aiSelectedModels));
+    } catch (e) {
+      /* ignore */
     }
   }, [aiSelectedModels]);
 
+  // messages shape: { GPT: [{role, content, loading?}, ...], Gemini: [...] }
   const [messages, setMessages] = useState({});
-  const [scrollToken, setScrollToken] = useState(0);
+
+  // control auto-scrolling behaviour in AiMultiModels:
+  // - true -> scroll to bottom when messages change (normal)
+  // - false -> scroll to top once (used when loading previous chat)
+  const [autoScroll, setAutoScroll] = useState(true);
 
   return (
     <AiSelectedModelContext.Provider
@@ -38,8 +47,8 @@ export const AiSelectedModelProvider = ({ children }) => {
         setAiSelectedModels,
         messages,
         setMessages,
-        scrollToken,
-        setScrollToken,
+        autoScroll,
+        setAutoScroll,
       }}
     >
       {children}
@@ -49,6 +58,6 @@ export const AiSelectedModelProvider = ({ children }) => {
 
 export const useAiSelectedModel = () => {
   const ctx = useContext(AiSelectedModelContext);
-  if (!ctx) throw new Error("useAiSelectedModel must be inside provider");
+  if (!ctx) throw new Error("useAiSelectedModel must be used inside provider");
   return ctx;
 };

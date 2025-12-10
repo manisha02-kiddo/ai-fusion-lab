@@ -1,58 +1,45 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState } from "react";
 import { Paperclip, Mic, Send } from "lucide-react";
 import { AiSelectedModelContext } from "@/context/AiSelectedModelContext";
 import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 
 import { db } from "@/config/FirebaseConfig";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
-import { useUser } from "@clerk/nextjs";
-import { useSearchParams } from "next/navigation";
-
-export default function ChatInputBox() {
+export default function ChatInputBox({ chatId }) {
   const [userInput, setUserInput] = useState("");
+  const { aiSelectedModels, setMessages, setAutoScroll, messages } =
+    useContext(AiSelectedModelContext);
 
-  const {
-    aiSelectedModels,
-    messages,
-    setMessages,
-    setAutoScroll,
-  } = useContext(AiSelectedModelContext);
-
-  const { user } = useUser();
-  const params = useSearchParams();
-
-  const [chatId, setChatId] = useState("");
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-
-  // Detect existing chat or create new (client-only)
-  useEffect(() => {
-    const existing = params.get("chatId");
-    if (existing) {
-      setChatId(existing);
-    } else {
-      setChatId(uuidv4());
-    }
-    setInitialLoadComplete(true);
-  }, [params]);
-
-  // ============================
-  // SEND MESSAGE
-  // ============================
   const handleSend = async () => {
-    if (!userInput.trim()) return;
+    if (!userInput.trim() || !chatId) return;
 
     const text = userInput.trim();
-    setUserInput("");
 
-    // when sending, enable auto-scroll again
+    /* ✅ CHECK DAILY LIMIT FIRST */
+    const tokenRes = await axios.post("/api/user-remaining-msg", { token: 1 });
+
+    if (!tokenRes.data?.allowed) {
+      toast.error("🚫 Daily free limit reached", {
+        description: "Upgrade to continue chatting.",
+      });
+      return; // ❌ stop completely
+    }
+
+    setUserInput("");
     setAutoScroll(true);
 
-    // add user message to all enabled models
+    /* ✅ ADD USER MESSAGE (UI) */
     setMessages((prev) => {
       const updated = { ...prev };
       Object.keys(aiSelectedModels).forEach((m) => {
@@ -61,37 +48,57 @@ export default function ChatInputBox() {
       return updated;
     });
 
-    for (const [parentModel, modelInfo] of Object.entries(aiSelectedModels)) {
-      const modelId = modelInfo.modelId;
+    const chatRef = doc(db, "chatHistory", chatId);
+    const snap = await getDoc(chatRef);
 
-      // add "thinking..." bubble
+    /* ✅ CREATE CHAT DOC IF NOT EXISTS */
+    if (!snap.exists()) {
+      await setDoc(chatRef, {
+        chatId,
+        title: text.length > 40 ? text.slice(0, 40) + "…" : text,
+        userEmail: "", // optional
+        createdAt: serverTimestamp(),
+        lastUpdated: serverTimestamp(),
+        messages: {},
+      });
+    }
+
+    /* ✅ SET TITLE ONLY ON FIRST MESSAGE */
+    if (snap.exists() && !snap.data().title) {
+      await updateDoc(chatRef, {
+        title: text.length > 40 ? text.slice(0, 40) + "…" : text,
+      });
+    }
+
+    /* ✅ AI CALLS */
+    for (const [parentModel, modelInfo] of Object.entries(aiSelectedModels)) {
+      if (!modelInfo?.enabled || !modelInfo?.modelId) continue;
+
       setMessages((prev) => ({
         ...prev,
         [parentModel]: [
           ...(prev[parentModel] || []),
-          { role: "assistant", content: "Thinking...", loading: true },
+          { role: "assistant", content: "Thinking…", loading: true },
         ],
       }));
 
       try {
         const res = await axios.post("/api/ai-multi-model", {
-          model: modelId,
+          model: modelInfo.modelId,
           parentModel,
           messages: [{ role: "user", content: text }],
         });
 
-        const reply = res.data?.aiResponse || "⚠️ No response";
-
         setMessages((prev) => {
-          const updated = [...prev[parentModel]];
-          updated.pop();
-          updated.push({ role: "assistant", content: reply });
+          const updated = [...(prev[parentModel] || [])];
+          if (updated.at(-1)?.loading) updated.pop();
+          updated.push({ role: "assistant", content: res.data.aiResponse });
           return { ...prev, [parentModel]: updated };
         });
-      } catch (err) {
+      } catch {
         setMessages((prev) => {
-          const updated = [...prev[parentModel]];
-          updated.pop();
+          const updated = [...(prev[parentModel] || [])];
+          if (updated.at(-1)?.loading) updated.pop();
           updated.push({
             role: "assistant",
             content: "⚠️ Error fetching response",
@@ -100,59 +107,36 @@ export default function ChatInputBox() {
         });
       }
     }
+
+    /* ✅ SAVE FINAL MESSAGES TO FIRESTORE (🔥 FIX) */
+    await updateDoc(chatRef, {
+      messages,
+      lastUpdated: serverTimestamp(),
+    });
   };
 
-  // ============================
-  // SAVE TO FIRESTORE
-  // ============================
-  useEffect(() => {
-    if (!initialLoadComplete) return;
-    if (!chatId || !messages) return;
-
-    const email = user?.primaryEmailAddress?.emailAddress;
-    if (!email) return;
-
-    setDoc(
-      doc(db, "chatHistory", chatId),
-      {
-        chatId,
-        userEmail: email,
-        messages,
-        lastUpdated: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  }, [messages, chatId, initialLoadComplete, user]);
-
-  // ============================
-  // UI
-  // ============================
   return (
-    <div className="fixed bottom-0 left-0 right-0 flex justify-center pb-6 z-50 bg-transparent">
-      <div className="w-full max-w-3xl bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-2xl shadow-md px-4 py-3">
-        <div className="w-full flex items-center gap-3">
+    <div className="fixed bottom-4 z-50 left-1/2 -translate-x-1/2 w-full px-4">
+      <div className="mx-auto w-full max-w-3xl bg-white dark:bg-neutral-900 border rounded-2xl shadow-xl px-4 py-3">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon">
-            <Paperclip className="text-black dark:text-white" />
+            <Paperclip />
           </Button>
 
           <input
             type="text"
             placeholder="Ask me anything..."
-            className="flex-1 bg-transparent text-black dark:text-white outline-none placeholder-gray-500 dark:placeholder-gray-400"
+            className="flex-1 bg-transparent outline-none"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
           />
 
           <Button variant="ghost" size="icon">
-            <Mic className="text-black dark:text-white" />
+            <Mic />
           </Button>
 
-          <Button
-            onClick={handleSend}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
+          <Button onClick={handleSend} className="bg-blue-600 text-white">
             <Send size={18} />
           </Button>
         </div>

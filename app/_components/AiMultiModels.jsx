@@ -1,8 +1,7 @@
 "use client";
 
-import AiModelList from "../shared/AiModelList";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import React, { useContext, useState, useEffect, useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -13,182 +12,205 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Loader, Lock, MessageSquare } from "lucide-react";
+import {
+  Loader,
+  Lock,
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AiSelectedModelContext } from "@/context/AiSelectedModelContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import AiModelList from "../shared/AiModelList";
 
-function AiMultiModels() {
+const COLUMN_WIDTH = 420;
+const GAP = 24;
+const STEP = COLUMN_WIDTH + GAP;
+
+export default function AiMultiModels() {
   const { aiSelectedModels, setAiSelectedModels, messages, autoScroll } =
     useContext(AiSelectedModelContext);
 
-  const [aiModelList, setAiModelList] = useState(AiModelList);
-
   const scrollRefs = useRef({});
+  const [mounted, setMounted] = useState(false);
+  const [index, setIndex] = useState(0);
 
-  // AUTO SCROLL (only when autoScroll === true)
+  const maxIndex = Math.max(0, AiModelList.length - 1);
+
+  /* ✅ hydration safe */
+  useEffect(() => setMounted(true), []);
+
+  /* ✅ auto scroll messages */
   useEffect(() => {
     if (!autoScroll) return;
-
-    Object.keys(scrollRefs.current).forEach((parent) => {
-      const box = scrollRefs.current[parent];
-      if (box) {
-        box.scrollTo({
-          top: box.scrollHeight,
-          behavior: "smooth",
-        });
-      }
-    });
+    Object.values(scrollRefs.current).forEach(
+      (el) => el && el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+    );
   }, [messages, autoScroll]);
 
-  const onToggleChange = (modelName, value) => {
-    setAiModelList((prev) =>
-      prev.map((m) => (m.model === modelName ? { ...m, enable: value } : m))
-    );
+  const isPremiumModel = (model) =>
+    model.subModel.every((m) => m.premium);
+
+  const toggleModel = (parent, value) => {
+    setAiSelectedModels((prev) => ({
+      ...prev,
+      [parent]: { ...prev[parent], enabled: value },
+    }));
   };
 
-  const onSelectValue = (parentModel, modelId) => {
-    const updated = {
-      ...aiSelectedModels,
-      [parentModel]: { modelId },
-    };
-    setAiSelectedModels(updated);
-  };
+  if (!mounted) {
+    return (
+      <div className="h-[40vh] flex items-center justify-center text-gray-400">
+        Loading models…
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-1 h-[calc(100vh-140px)] border-b dark:border-neutral-800">
-      {aiModelList.map((model, index) => {
-        const parent = model.model;
-        const isPremiumUser = false;
-        const showLock = model.premium && !isPremiumUser;
+    /* ✅ FIXED HEIGHT → enables vertical scroll */
+    <div className="relative w-full h-[calc(100vh-180px)] overflow-hidden">
+      
+      {/* ✅ HORIZONTAL VIEWPORT */}
+      <div className="h-full overflow-hidden">
+        <div
+          className="flex gap-6 px-4 h-full min-w-max transition-transform duration-300"
+          style={{ transform: `translateX(-${index * STEP}px)` }}
+        >
+          {AiModelList.map((model) => {
+            const parent = model.model;
+            const enabled = aiSelectedModels?.[parent]?.enabled ?? false;
+            const isPremium = isPremiumModel(model);
 
-        return (
-          <div
-            key={index}
-            className={`flex flex-col border-r dark:border-neutral-800 h-full transition-all ${
-              model.enable ? "flex-1 min-w-[350px]" : "w-[100px]"
-            }`}
-          >
-            {/* Header */}
-            <div className="flex w-full h-[60px] items-center justify-between p-4 border-b bg-white dark:bg-neutral-900 dark:text-white">
-              <div className="flex items-center gap-4">
-                <Image src={model.icon} alt={model.model} width={24} height={24} />
-
-                {model.enable && (
-                  <Select
-                    value={aiSelectedModels?.[parent]?.modelId}
-                    onValueChange={(value) => onSelectValue(parent, value)}
-                    disabled={model.premium}
-                  >
-                    <SelectTrigger className="w-40 bg-white dark:bg-neutral-800 border dark:border-neutral-700 text-black dark:text-white">
-                      <SelectValue
-                        placeholder="Select model"
-                        className="text-black dark:text-white"
-                      />
-                    </SelectTrigger>
-
-                    <SelectContent className="bg-white dark:bg-neutral-800 dark:text-white border dark:border-neutral-700">
-                      <SelectGroup className="px-3">
-                        <SelectLabel className="text-sm text-gray-500 dark:text-gray-300">
-                          Free
-                        </SelectLabel>
-
-                        {model.subModel
-                          .filter((m) => !m.premium)
-                          .map((sub, i) => (
-                            <SelectItem
-                              key={i}
-                              value={sub.id}
-                              className="dark:text-white dark:hover:bg-neutral-700"
-                            >
-                              {sub.name}
-                            </SelectItem>
-                          ))}
-                      </SelectGroup>
-
-                      <SelectGroup className="px-3">
-                        <SelectLabel className="text-sm text-gray-500 dark:text-gray-300">
-                          Premium
-                        </SelectLabel>
-
-                        {model.subModel
-                          .filter((m) => m.premium)
-                          .map((sub, i) => (
-                            <SelectItem
-                              key={i}
-                              value={sub.id}
-                              disabled
-                              className="dark:text-gray-400 dark:hover:bg-neutral-700"
-                            >
-                              {sub.name}{" "}
-                              <Lock className="h-4 w-4 inline-block ml-1" />
-                            </SelectItem>
-                          ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {model.enable ? (
-                <Switch
-                  checked={model.enable}
-                  onCheckedChange={(v) => onToggleChange(parent, v)}
-                />
-              ) : (
-                <MessageSquare
-                  className="cursor-pointer dark:text-white"
-                  onClick={() => onToggleChange(parent, true)}
-                />
-              )}
-            </div>
-
-            {/* Lock View */}
-            {showLock && model.enable && (
-              <div className="flex items-center justify-center h-full">
-                <Button
-                  variant="outline"
-                  className="dark:border-neutral-700 dark:text-white"
-                >
-                  <Lock className="mr-2" /> Upgrade to Unlock
-                </Button>
-              </div>
-            )}
-
-            {/* Messages */}
-            {!showLock && model.enable && (
+            return (
               <div
-                className="flex-1 p-4 overflow-y-auto space-y-3 pb-32"
-                ref={(el) => (scrollRefs.current[parent] = el)}
+                key={parent}
+                className={`
+                  flex flex-col h-full
+                  border rounded-xl
+                  bg-white dark:bg-neutral-900 dark:border-neutral-800
+                  flex-shrink-0
+                  ${enabled ? "w-[420px]" : "w-[120px]"}
+                `}
               >
-                {(messages?.[parent] || []).map((m, i) => (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-lg whitespace-pre-wrap ${
-                      m.role === "user"
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-neutral-800 text-gray-900 dark:text-gray-100"
-                    }`}
-                  >
-                    {m.loading ? (
-                      <div className="flex items-center gap-2">
-                        <Loader className="animate-spin h-4 w-4" /> Thinking...
-                      </div>
-                    ) : (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {m.content}
-                      </ReactMarkdown>
+                {/* HEADER (fixed) */}
+                <div className="flex items-center justify-between p-4 border-b shrink-0">
+                  <div className="flex items-center gap-3">
+                    <Image src={model.icon} alt={parent} width={22} height={22} />
+                    {enabled && !isPremium && (
+                      <Select value={aiSelectedModels?.[parent]?.modelId}>
+                        <SelectTrigger className="w-36">
+                          <SelectValue placeholder="Select model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectLabel>Free</SelectLabel>
+                            {model.subModel
+                              .filter((m) => !m.premium)
+                              .map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.name}
+                                </SelectItem>
+                              ))}
+                          </SelectGroup>
+                          <SelectGroup>
+                            <SelectLabel>Premium</SelectLabel>
+                            {model.subModel
+                              .filter((m) => m.premium)
+                              .map((s) => (
+                                <SelectItem key={s.id} value={s.id} disabled>
+                                  🔒 {s.name}
+                                </SelectItem>
+                              ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
                     )}
                   </div>
-                ))}
+
+                  {enabled ? (
+                    <Switch
+                      checked
+                      onCheckedChange={(v) => toggleModel(parent, v)}
+                    />
+                  ) : (
+                    <MessageSquare
+                      className="cursor-pointer text-gray-500 hover:text-black"
+                      onClick={() => toggleModel(parent, true)}
+                    />
+                  )}
+                </div>
+
+                {/* BODY */}
+                {enabled && (
+                  <>
+                    {isPremium ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+                        <Lock className="w-8 h-8 mb-3 text-gray-400" />
+                        <p className="font-semibold">Upgrade to unlock</p>
+                        <p className="text-sm text-gray-500 mb-4">
+                          This model is available on premium plans.
+                        </p>
+                        <Button>Upgrade Plan</Button>
+                      </div>
+                    ) : (
+                      /* ✅ THIS NOW SCROLLS */
+                      <div
+                        ref={(el) => (scrollRefs.current[parent] = el)}
+                        className="
+                          flex-1 overflow-y-auto
+                          overscroll-contain
+                          px-4 py-3 space-y-4
+                        "
+                      >
+                        {(messages?.[parent] || []).map((m, i) => (
+                          <div
+                            key={i}
+                            className={`rounded-xl px-4 py-3 text-sm max-w-[90%] ${
+                              m.role === "user"
+                                ? "ml-auto bg-blue-600 text-white"
+                                : "bg-gray-100 dark:bg-neutral-800"
+                            }`}
+                          >
+                            {m.loading ? (
+                              <Loader className="animate-spin w-4 h-4" />
+                            ) : (
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {m.content}
+                              </ReactMarkdown>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            )}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ✅ HORIZONTAL SCROLL ARROWS */}
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 flex gap-4 z-40">
+        <Button
+          size="icon"
+          variant="outline"
+          disabled={index === 0}
+          onClick={() => setIndex((p) => Math.max(p - 1, 0))}
+        >
+          <ChevronLeft />
+        </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          disabled={index === maxIndex}
+          onClick={() => setIndex((p) => Math.min(p + 1, maxIndex))}
+        >
+          <ChevronRight />
+        </Button>
+      </div>
     </div>
   );
 }
-
-export default AiMultiModels;

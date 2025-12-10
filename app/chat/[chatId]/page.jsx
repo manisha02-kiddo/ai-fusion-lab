@@ -1,67 +1,67 @@
 "use client";
 
-import React, { useEffect, useState, useContext } from "react";
-import AiMultiModels from "../../_components/AiMultiModels";
-import ChatInputBox from "../../_components/ChatInputBox";
+import React, { use, useContext, useEffect } from "react";
+import AiMultiModels from "@/app/_components/AiMultiModels";
+import ChatInputBox from "@/app/_components/ChatInputBox";
 import { AiSelectedModelContext } from "@/context/AiSelectedModelContext";
 import { db } from "@/config/FirebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useUser } from "@clerk/nextjs";
 
 export default function ChatPage({ params }) {
-  const [chatId, setChatId] = useState(null);
-  const { setMessages, setAutoScroll } = useContext(AiSelectedModelContext);
+  const { chatId } = use(params);
+  const { setMessages, setAutoScroll } =
+    useContext(AiSelectedModelContext);
+  const { user } = useUser();
 
-  // unwrap the params (Next 15 style)
+  /* ✅ CREATE CHAT IMMEDIATELY */
   useEffect(() => {
-    async function loadParams() {
-      const resolved = await params;
-      setChatId(resolved.chatId);
-    }
-    loadParams();
-  }, [params]);
+    if (!chatId || !user?.primaryEmailAddress) return;
 
-  // load messages from Firestore
+    const createChatIfNotExists = async () => {
+      const ref = doc(db, "chatHistory", chatId);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists()) {
+        await setDoc(ref, {
+          chatId,
+          userEmail: user.primaryEmailAddress.emailAddress,
+          messages: {},
+          createdAt: serverTimestamp(),
+          lastUpdated: serverTimestamp(),
+        });
+      }
+    };
+
+    createChatIfNotExists();
+  }, [chatId, user]);
+
+  /* ✅ LOAD MESSAGES */
   useEffect(() => {
     if (!chatId) return;
 
-    async function loadChat() {
-      try {
-        const docRef = doc(db, "chatHistory", chatId);
-        const snap = await getDoc(docRef);
+    const loadChat = async () => {
+      const ref = doc(db, "chatHistory", chatId);
+      const snap = await getDoc(ref);
 
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data.messages) {
-            // replace current messages with this chat
-            setMessages(data.messages);
-
-            // IMPORTANT: do NOT auto-scroll on first load
-            setAutoScroll(false);
-          }
-        }
-      } catch (err) {
-        console.error("❌ Error loading chat:", err);
+      if (snap.exists()) {
+        setAutoScroll(false);
+        setMessages(snap.data().messages || {});
+      } else {
+        setMessages({});
       }
-    }
+    };
 
     loadChat();
-  }, [chatId, setMessages, setAutoScroll]);
+  }, [chatId]);
 
   if (!chatId) return <div className="p-10">Loading chat…</div>;
 
   return (
     <div className="flex w-full h-screen overflow-hidden">
-      <div className="flex flex-col flex-1 relative bg-white dark:bg-neutral-900">
-        {/* MODEL COLUMNS */}
-        <div className="w-full flex justify-center pt-4 pb-2 border-b dark:border-neutral-800 bg-white dark:bg-neutral-900">
-          <AiMultiModels />
-        </div>
-
-        {/* MAIN AREA */}
-        <div className="flex-1 overflow-y-auto px-4 py-4" />
-
-        {/* INPUT */}
-        <ChatInputBox />
+      <div className="flex flex-col flex-1 relative bg-white dark:bg-neutral-900 pb-28">
+        <AiMultiModels />
+        <ChatInputBox chatId={chatId} />
       </div>
     </div>
   );
